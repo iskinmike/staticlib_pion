@@ -6,9 +6,8 @@
 
 #include "WebSocket.h"
 
-//#include "md5/md5.h"
-#include "base64/base64.h"
-#include "sha1/sha1.h"
+#include "staticlib/crypto/sha1.hpp"
+#include "staticlib/crypto/base64.hpp"
 
 #include <iostream>
 #include <string>
@@ -112,8 +111,6 @@ vector<string> WebSocket::explode(
 
 string WebSocket::answerHandshake() 
 {
-    unsigned char digest[20]; // 160 bit sha1 digest
-
 	string answer;
 	answer += "HTTP/1.1 101 Switching Protocols\r\n";
 	answer += "Upgrade: WebSocket\r\n";
@@ -123,32 +120,10 @@ string WebSocket::answerHandshake()
 		accept_key += this->key;
 		accept_key += "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"; //RFC6544_MAGIC_KEY
 
-		//printf("INTERMEDIATE_KEY:(%s)\n", accept_key.data());
+        std::string sha1_key = sha1_encode(accept_key);
+        accept_key = base64_encode(sha1_key);
 
-		SHA1 sha;
-		sha.Input(accept_key.data(), accept_key.size());
-		sha.Result((unsigned*)digest);
-		
-		//printf("DIGEST:"); for(int i=0; i<20; i++) printf("%02x ",digest[i]); printf("\n");
-
-		//little endian to big endian
-		for(int i=0; i<20; i+=4) {
-			unsigned char c;
-
-			c = digest[i];
-			digest[i] = digest[i+3];
-			digest[i+3] = c;
-
-			c = digest[i+1];
-			digest[i+1] = digest[i+2];
-			digest[i+2] = c;
-		}
-
-		//printf("DIGEST:"); for(int i=0; i<20; i++) printf("%02x ",digest[i]); printf("\n");
-
-		accept_key = base64_encode((const unsigned char *)digest, 20); //160bit = 20 bytes/chars
-
-		answer += "Sec-WebSocket-Accept: "+(accept_key)+"\r\n";
+        answer += "Sec-WebSocket-Accept: "+(accept_key)+"\r\n";
 	}
 	if(this->protocol.length() > 0) {
 		answer += "Sec-WebSocket-Protocol: "+(this->protocol)+"\r\n";
